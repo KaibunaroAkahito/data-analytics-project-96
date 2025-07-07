@@ -112,8 +112,8 @@ leads_aggregated AS (
 )
 
 SELECT
-    COALESCE(v.visit_date, c.visit_date, l.visit_date) AS visit_date,
     v.visitors_count,
+    COALESCE(v.visit_date, c.visit_date, l.visit_date) AS visit_date,
     COALESCE(v.utm_source, c.utm_source, l.utm_source) AS utm_source,
     COALESCE(v.utm_medium, c.utm_medium, l.utm_medium) AS utm_medium,
     COALESCE(v.utm_campaign, c.utm_campaign, l.utm_campaign) AS utm_campaign,
