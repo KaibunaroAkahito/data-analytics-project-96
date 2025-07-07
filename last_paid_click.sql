@@ -27,7 +27,6 @@ last_paid_clicks AS (
   FROM sessions s
   JOIN paid_channels pc ON s.medium = pc.medium
 ),
-
 -- Получаем только последние платные клики
 last_paid_click_per_visitor AS (
   SELECT * FROM last_paid_clicks WHERE rn = 1
