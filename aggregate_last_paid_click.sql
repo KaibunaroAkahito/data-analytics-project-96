@@ -22,7 +22,7 @@ last_paid_clicks AS (
         s.campaign AS utm_campaign,
         TO_CHAR(s.visit_date, 'YYYY-MM-DD') AS visit_date,
         ROW_NUMBER() OVER (
-            PARTITION BY s.visitor_id 
+            PARTITION BY s.visitor_id
             ORDER BY s.visit_date DESC
         ) AS rn
     FROM sessions AS s
