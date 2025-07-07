@@ -22,7 +22,8 @@ last_paid_clicks AS (
         s.campaign AS utm_campaign,
         TO_CHAR(s.visit_date, 'YYYY-MM-DD') AS visit_date,
         ROW_NUMBER() OVER (
-            PARTITION BY s.visitor_id ORDER BY s.visit_date DESC
+            PARTITION BY s.visitor_id 
+            ORDER BY s.visit_date DESC
         ) AS rn
     FROM sessions AS s
     INNER JOIN paid_channels AS pc ON s.medium = pc.medium
@@ -111,15 +112,15 @@ leads_aggregated AS (
 )
 
 SELECT
+    COALESCE(v.visit_date, c.visit_date, l.visit_date) AS visit_date,
     v.visitors_count,
+    COALESCE(v.utm_source, c.utm_source, l.utm_source) AS utm_source,
+    COALESCE(v.utm_medium, c.utm_medium, l.utm_medium) AS utm_medium,
+    COALESCE(v.utm_campaign, c.utm_campaign, l.utm_campaign) AS utm_campaign,
     c.total_cost,
     l.leads_count,
     l.purchases_count,
-    l.revenue,
-    COALESCE(v.visit_date, c.visit_date, l.visit_date) AS visit_date,
-    COALESCE(v.utm_source, c.utm_source, l.utm_source) AS utm_source,
-    COALESCE(v.utm_medium, c.utm_medium, l.utm_medium) AS utm_medium,
-    COALESCE(v.utm_campaign, c.utm_campaign, l.utm_campaign) AS utm_campaign
+    l.revenue
 FROM visits_aggregated AS v
 FULL OUTER JOIN
     costs_aggregated AS c
@@ -136,4 +137,9 @@ FULL OUTER JOIN
         AND COALESCE(v.utm_medium, c.utm_medium) = l.utm_medium
         AND COALESCE(v.utm_campaign, c.utm_campaign) = l.utm_campaign
 ORDER BY
-    l.revenue DESC NULLS LAST, COALESCE(v.visit_date, c.visit_date, l.visit_date) ASC, v.visitors_count DESC, COALESCE(v.utm_source, c.utm_source, l.utm_source) ASC, COALESCE(v.utm_medium, c.utm_medium, l.utm_medium) ASC, COALESCE(v.utm_campaign, c.utm_campaign, l.utm_campaign) ASC;
+    l.revenue DESC NULLS LAST,
+    COALESCE(v.visit_date, c.visit_date, l.visit_date) ASC,
+    v.visitors_count DESC,
+    COALESCE(v.utm_source, c.utm_source, l.utm_source) ASC,
+    COALESCE(v.utm_medium, c.utm_medium, l.utm_medium) ASC,
+    COALESCE(v.utm_campaign, c.utm_campaign, l.utm_campaign) ASC;
