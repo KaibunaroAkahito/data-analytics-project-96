@@ -1,5 +1,4 @@
 WITH
--- Определяем платные каналы
 paid_channels AS (
   SELECT 'cpc' AS medium UNION ALL
   SELECT 'cpm' UNION ALL
@@ -10,11 +9,10 @@ paid_channels AS (
   SELECT 'social'
 ),
 
--- Находим последний платный клик для каждого посетителя
 last_paid_clicks AS (
   SELECT
     s.visitor_id,
-    TO_CHAR(s.visit_date, 'YYYY-MM-DD') AS visit_date,  -- Форматируем здесь
+    TO_CHAR(s.visit_date, 'YYYY-MM-DD') AS visit_date,
     s.source AS utm_source,
     s.medium AS utm_medium,
     s.campaign AS utm_campaign,
@@ -26,11 +24,10 @@ last_paid_clicks AS (
   JOIN paid_channels pc ON s.medium = pc.medium
 ),
 
--- Получаем только последние платные клики
 last_paid_click_per_visitor AS (
   SELECT
     visitor_id,
-    visit_date,  -- Уже в нужном формате
+    visit_date,
     utm_source,
     utm_medium,
     utm_campaign
@@ -38,10 +35,9 @@ last_paid_click_per_visitor AS (
   WHERE rn = 1
 ),
 
--- Агрегируем данные по визитам
 visits_aggregated AS (
   SELECT
-    visit_date,  -- Уже в нужном формате
+    visit_date,
     utm_source,
     utm_medium,
     utm_campaign,
@@ -49,35 +45,31 @@ visits_aggregated AS (
   FROM last_paid_click_per_visitor
   GROUP BY visit_date, utm_source, utm_medium, utm_campaign
 ),
-  
--- Агрегируем расходы на рекламу
+
 costs_aggregated AS (
-  -- Расходы из VK
   SELECT
     utm_source,
     utm_medium,
     utm_campaign,
-    TO_CHAR(campaign_date, 'YYYY-MM-DD') AS visit_date,  -- Форматируем здесь
+    TO_CHAR(campaign_date, 'YYYY-MM-DD') AS visit_date,
     SUM(daily_spent) AS total_cost
   FROM vk_ads
   GROUP BY utm_source, utm_medium, utm_campaign, TO_CHAR(campaign_date, 'YYYY-MM-DD')
 UNION ALL
 
-  -- Расходы из Yandex
   SELECT
     utm_source,
     utm_medium,
     utm_campaign,
-    TO_CHAR(campaign_date, 'YYYY-MM-DD') AS visit_date,  -- Форматируем здесь
+    TO_CHAR(campaign_date, 'YYYY-MM-DD') AS visit_date,
     SUM(daily_spent) AS total_cost
   FROM ya_ads
   GROUP BY utm_source, utm_medium, utm_campaign, TO_CHAR(campaign_date, 'YYYY-MM-DD')
 ),
 
--- Агрегируем данные по лидам
 leads_aggregated AS (
   SELECT
-    lpc.visit_date,  -- Уже в нужном формате
+    lpc.visit_date,
     lpc.utm_source,
     lpc.utm_medium,
     lpc.utm_campaign,
@@ -86,11 +78,10 @@ leads_aggregated AS (
     SUM(CASE WHEN l.closing_reason = 'Успешно реализовано' OR l.status_id = 142 THEN l.amount ELSE 0 END) AS revenue
   FROM last_paid_click_per_visitor lpc
   LEFT JOIN leads l ON lpc.visitor_id = l.visitor_id
-    AND TO_CHAR(l.created_at, 'YYYY-MM-DD') >= lpc.visit_date  -- Сравниваем в одинаковом формате
+    AND TO_CHAR(l.created_at, 'YYYY-MM-DD') >= lpc.visit_date
   GROUP BY lpc.visit_date, lpc.utm_source, lpc.utm_medium, lpc.utm_campaign
 )
 
--- Финальная витрина
 SELECT
     v.visitors_count,
     c.total_cost,
