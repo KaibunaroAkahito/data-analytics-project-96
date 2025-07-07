@@ -1,3 +1,4 @@
+visit_date,visitors_count,utm_source,utm_medium,utm_campaign,total_cost,leads_count,purchases_count,revenue
 2023-06-01,103,yandex,cpc,freemium,21654,100,25,1654810
 2023-06-01,78,yandex,cpc,prof-frontend,57138,73,12,1057000
 2023-06-01,62,yandex,cpc,prof-python,33026,61,7,613196
