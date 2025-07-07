@@ -49,7 +49,7 @@ visits_aggregated AS (
   FROM last_paid_click_per_visitor
   GROUP BY visit_date, utm_source, utm_medium, utm_campaign
 ),
-
+  
 -- Агрегируем расходы на рекламу
 costs_aggregated AS (
   -- Расходы из VK
@@ -89,7 +89,7 @@ leads_aggregated AS (
     AND TO_CHAR(l.created_at, 'YYYY-MM-DD') >= lpc.visit_date  -- Сравниваем в одинаковом формате
   GROUP BY lpc.visit_date, lpc.utm_source, lpc.utm_medium, lpc.utm_campaign
 )
-  
+
 -- Финальная витрина
 SELECT
     v.visitors_count,
