@@ -1,21 +1,4 @@
 WITH
--- Определяем платные каналы
-paid_channels AS (
-    SELECT 'cpc' AS medium
-    UNION ALL
-    SELECT 'cpm'
-    UNION ALL
-    SELECT 'cpa'
-    UNION ALL
-    SELECT 'youtube'
-    UNION ALL
-    SELECT 'cpp'
-    UNION ALL
-    SELECT 'tg'
-    UNION ALL
-    SELECT 'social'
-),
-
 -- Агрегируем данные по визитам
 visits_data AS (
     SELECT
