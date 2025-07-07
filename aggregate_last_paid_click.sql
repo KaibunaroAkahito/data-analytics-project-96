@@ -113,14 +113,14 @@ leads_aggregated AS (
 
 SELECT
     v.visitors_count,
+    c.total_cost,
+    l.leads_count,
+    l.purchases_count,
+    l.revenue,
     COALESCE(v.visit_date, c.visit_date, l.visit_date) AS visit_date,
     COALESCE(v.utm_source, c.utm_source, l.utm_source) AS utm_source,
     COALESCE(v.utm_medium, c.utm_medium, l.utm_medium) AS utm_medium,
     COALESCE(v.utm_campaign, c.utm_campaign, l.utm_campaign) AS utm_campaign,
-    c.total_cost,
-    l.leads_count,
-    l.purchases_count,
-    l.revenue
 FROM visits_aggregated AS v
 FULL OUTER JOIN
     costs_aggregated AS c
