@@ -16,49 +16,29 @@ paid_channels AS (
     SELECT 'social'
 ),
 
--- Находим последний платный клик для каждого посетителя
-last_paid_clicks AS (
+-- Агрегируем данные по визитам
+visits_data AS (
     SELECT
-        s.visitor_id,
-        -- Форматируем с временем
-        s.landing_page,
-        s.source AS utm_source,
-        s.medium AS utm_medium,
-        s.campaign AS utm_campaign,
-        s.content AS utm_content,
-        TO_CHAR(s.visit_date, 'YYYY-MM-DD HH24:MI:SS.MS') AS visit_date,
-        ROW_NUMBER() OVER (
-            PARTITION BY s.visitor_id
-            ORDER BY s.visit_date DESC
-        ) AS rn
-    FROM sessions AS s
-    INNER JOIN paid_channels AS pc ON s.medium = pc.medium
+        source AS utm_source,
+        medium AS utm_medium,
+        campaign AS utm_campaign,
+        DATE(visit_date) AS visit_date,
+        COUNT(DISTINCT visitor_id) AS visitors_count
+    FROM sessions
+    GROUP BY DATE(visit_date), source, medium, campaign
 ),
 
--- Получаем только последние платные клики
-last_paid_click_per_visitor AS (
-    SELECT * FROM last_paid_clicks
-    WHERE rn = 1
-),
-
--- Агрегируем расходы на рекламу по utm-меткам
-marketing_costs AS (
+-- Агрегируем расходы на рекламу
+costs_data AS (
     -- Расходы из VK
     SELECT
         utm_source,
         utm_medium,
         utm_campaign,
-        utm_content,
-        -- Форматируем с временем
-        TO_CHAR(campaign_date, 'YYYY-MM-DD HH24:MI:SS.MS') AS campaign_date,
-        SUM(daily_spent) AS cost
+        campaign_date AS visit_date,
+        SUM(daily_spent) AS total_cost
     FROM vk_ads
-    GROUP BY
-        utm_source,
-        utm_medium,
-        utm_campaign,
-        utm_content,
-        TO_CHAR(campaign_date, 'YYYY-MM-DD HH24:MI:SS.MS')
+    GROUP BY utm_source, utm_medium, utm_campaign, campaign_date
 
     UNION ALL
 
@@ -67,47 +47,79 @@ marketing_costs AS (
         utm_source,
         utm_medium,
         utm_campaign,
-        utm_content,
-        -- Форматируем с временем
-        TO_CHAR(campaign_date, 'YYYY-MM-DD HH24:MI:SS.MS') AS campaign_date,
-        SUM(daily_spent) AS cost
+        campaign_date AS visit_date,
+        SUM(daily_spent) AS total_cost
     FROM ya_ads
-    GROUP BY
-        utm_source,
-        utm_medium,
-        utm_campaign,
-        utm_content,
-        TO_CHAR(campaign_date, 'YYYY-MM-DD HH24:MI:SS.MS')
+    GROUP BY utm_source, utm_medium, utm_campaign, campaign_date
+),
+
+-- Агрегируем данные по лидам
+leads_data AS (
+    SELECT
+        s.source AS utm_source,
+        s.medium AS utm_medium,
+        s.campaign AS utm_campaign,
+        DATE(s.visit_date) AS visit_date,
+        COUNT(DISTINCT l.lead_id) AS leads_count,
+        COUNT(
+            DISTINCT CASE
+                WHEN
+                    l.closing_reason = 'Успешно реализовано'
+                    OR l.status_id = 142
+                    THEN l.lead_id
+            END
+        ) AS purchases_count,
+        SUM(
+            CASE
+                WHEN
+                    l.closing_reason = 'Успешно реализовано'
+                    OR l.status_id = 142
+                    THEN l.amount
+                ELSE 0
+            END
+        ) AS revenue
+    FROM sessions AS s
+    LEFT JOIN
+        leads AS l
+        ON s.visitor_id = l.visitor_id AND s.visit_date <= l.created_at
+    GROUP BY DATE(s.visit_date), s.source, s.medium, s.campaign
 )
 
--- Финальная витрина с атрибуцией и расчетом ROI
+-- Финальный набор данных для дашборда
 SELECT
-    lpc.visitor_id,
-    lpc.visit_date,  -- Уже в нужном формате
-    lpc.utm_source,
-    lpc.utm_medium,
-    lpc.utm_campaign,
-    l.lead_id,
-    -- Форматируем с временем
-    l.amount,
-    l.closing_reason,
-    l.status_id,
-    TO_CHAR(l.created_at, 'YYYY-MM-DD HH24:MI:SS.MS') AS created_at
-FROM last_paid_click_per_visitor AS lpc
-LEFT JOIN leads AS l
-    ON lpc.visitor_id = l.visitor_id
-    -- Сравниваем в одинаковом формате
-    AND TO_CHAR(l.created_at, 'YYYY-MM-DD HH24:MI:SS.MS') >= lpc.visit_date
-LEFT JOIN marketing_costs AS mc
+    v.visitors_count,
+    c.total_cost,
+    l.leads_count,
+    l.purchases_count,
+    l.revenue,
+    COALESCE(v.visit_date, c.visit_date, l.visit_date) AS date,
+    COALESCE(v.utm_source, c.utm_source, l.utm_source) AS utm_source,
+    COALESCE(v.utm_medium, c.utm_medium, l.utm_medium) AS utm_medium,
+    COALESCE(v.utm_campaign, c.utm_campaign, l.utm_campaign) AS utm_campaign,
+    -- Рассчитываем метрики
+    CASE
+        WHEN v.visitors_count > 0 THEN c.total_cost / v.visitors_count
+    END AS cpu,
+    CASE
+        WHEN l.leads_count > 0 THEN c.total_cost / l.leads_count
+    END AS cpl,
+    CASE
+        WHEN l.purchases_count > 0 THEN c.total_cost / l.purchases_count
+    END AS cppu,
+    CASE
+        WHEN
+            c.total_cost > 0
+            THEN (l.revenue - c.total_cost) / c.total_cost * 100
+    END AS roi
+FROM visits_data AS v
+FULL OUTER JOIN costs_data AS c
     ON
-        lpc.utm_source = mc.utm_source
-        AND lpc.utm_medium = mc.utm_medium
-        AND lpc.utm_campaign = mc.utm_campaign
-        AND lpc.utm_content = mc.utm_content
-        AND lpc.visit_date = mc.campaign_date  -- Оба поля в одинаковом формате
-ORDER BY
-    l.amount DESC NULLS LAST,
-    lpc.visit_date ASC,
-    lpc.utm_source ASC,
-    lpc.utm_medium ASC,
-    lpc.utm_campaign ASC;
+        v.visit_date = c.visit_date
+        AND v.utm_source = c.utm_source
+        AND v.utm_medium = c.utm_medium
+        AND v.utm_campaign = c.utm_campaign
+FULL OUTER JOIN leads_data AS l ON
+    COALESCE(v.visit_date, c.visit_date) = l.visit_date
+    AND COALESCE(v.utm_source, c.utm_source) = l.utm_source
+    AND COALESCE(v.utm_medium, c.utm_medium) = l.utm_medium
+    AND COALESCE(v.utm_campaign, c.utm_campaign) = l.utm_campaign
