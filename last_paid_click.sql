@@ -1,22 +1,5 @@
 WITH
--- Определяем платные каналы
-paid_channels AS (
-    SELECT 'cpc' AS channel_medium
-    UNION ALL
-    SELECT 'cpm'
-    UNION ALL
-    SELECT 'cpa'
-    UNION ALL
-    SELECT 'youtube'
-    UNION ALL
-    SELECT 'cpp'
-    UNION ALL
-    SELECT 'tg'
-    UNION ALL
-    SELECT 'social'
-),
-
--- Находим последний платный клик для каждого посетителя
+-- Находим последний платный клик для каждого посетителя (с прямым условием для medium)
 last_paid_clicks AS (
     SELECT
         s.visitor_id,
@@ -31,7 +14,7 @@ last_paid_clicks AS (
             ORDER BY s.visit_date DESC
         ) AS rn
     FROM sessions AS s
-    INNER JOIN paid_channels AS pc ON s.medium = pc.channel_medium
+    WHERE s.medium IN ('cpc', 'cpm', 'cpa', 'youtube', 'cpp', 'tg', 'social')
 ),
 
 -- Получаем только последние платные клики
