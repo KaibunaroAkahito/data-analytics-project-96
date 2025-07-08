@@ -15,15 +15,9 @@ last_paid_clicks AS (
         ) AS rn
     FROM sessions AS s
     WHERE s.medium IN ('cpc', 'cpm', 'cpa', 'youtube', 'cpp', 'tg', 'social')
-),
-
--- Получаем только последние платные клики
-last_paid_click_per_visitor AS (
-    SELECT * FROM last_paid_clicks
-    WHERE rn = 1
 )
 
--- Финальная витрина с атрибуцией (без маркетинговых затрат)
+-- Основной запрос с встроенной фильтрацией последних кликов
 SELECT
     lpc.visitor_id,
     lpc.visit_date,
@@ -35,7 +29,11 @@ SELECT
     l.closing_reason,
     l.status_id,
     TO_CHAR(l.created_at, 'YYYY-MM-DD HH24:MI:SS.MS') AS created_at
-FROM last_paid_click_per_visitor AS lpc
+FROM (
+    SELECT *
+    FROM last_paid_clicks
+    WHERE rn = 1
+) AS lpc
 LEFT JOIN leads AS l
     ON
         lpc.visitor_id = l.visitor_id
