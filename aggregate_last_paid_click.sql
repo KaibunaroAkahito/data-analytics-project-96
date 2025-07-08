@@ -1,20 +1,4 @@
-WITH paid_channels AS (
-    SELECT 'cpc' AS medium
-    UNION ALL
-    SELECT 'cpm'
-    UNION ALL
-    SELECT 'cpa'
-    UNION ALL
-    SELECT 'youtube'
-    UNION ALL
-    SELECT 'cpp'
-    UNION ALL
-    SELECT 'tg'
-    UNION ALL
-    SELECT 'social'
-),
-
-last_paid_clicks AS (
+WITH last_paid_clicks AS (
     SELECT
         s.visitor_id,
         s.source AS utm_source,
@@ -26,7 +10,7 @@ last_paid_clicks AS (
             ORDER BY s.visit_date DESC
         ) AS rn
     FROM sessions AS s
-    INNER JOIN paid_channels AS pc ON s.medium = pc.medium
+    WHERE s.medium IN ('cpc', 'cpm', 'cpa', 'youtube', 'cpp', 'tg', 'social')
 ),
 
 last_paid_click_per_visitor AS (
@@ -38,17 +22,6 @@ last_paid_click_per_visitor AS (
         utm_campaign
     FROM last_paid_clicks
     WHERE rn = 1
-),
-
-visits_aggregated AS (
-    SELECT
-        visit_date,
-        utm_source,
-        utm_medium,
-        utm_campaign,
-        COUNT(visitor_id) AS visitors_count
-    FROM last_paid_click_per_visitor
-    GROUP BY visit_date, utm_source, utm_medium, utm_campaign
 ),
 
 costs_aggregated AS (
@@ -121,7 +94,16 @@ SELECT
     COALESCE(v.utm_source, c.utm_source, l.utm_source) AS utm_source,
     COALESCE(v.utm_medium, c.utm_medium, l.utm_medium) AS utm_medium,
     COALESCE(v.utm_campaign, c.utm_campaign, l.utm_campaign) AS utm_campaign
-FROM visits_aggregated AS v
+FROM (
+    SELECT
+        visit_date,
+        utm_source,
+        utm_medium,
+        utm_campaign,
+        COUNT(visitor_id) AS visitors_count
+    FROM last_paid_click_per_visitor
+    GROUP BY visit_date, utm_source, utm_medium, utm_campaign
+) AS v
 FULL OUTER JOIN
     costs_aggregated AS c
     ON
